@@ -1,0 +1,1134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>NutriTrack Pro</title>
+
+  <script>
+    window.addEventListener('error', function(e){
+      var root=document.getElementById('root');
+      if(root && !root.innerHTML.trim()){
+        root.innerHTML='<div style="font-family:system-ui;background:#0d0d12;color:#e2e8f0;min-height:100vh;padding:24px"><h1 style="color:#818cf8">NutriTrack</h1><p>Erreur de chargement :</p><pre style="white-space:pre-wrap;background:#16161f;padding:12px;border-radius:10px">'+(e.message||'Erreur inconnue')+'</pre></div>';
+      }
+    });
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.15.4/umd/Recharts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+  <script type="text/babel">
+const { useState, useEffect } = React;
+const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area, BarChart, Bar, Legend } = Recharts;
+
+// ─── FOOD DATABASE (no fish) ──────────────────────────────────────────────────
+const FOOD_DB = {
+  // Féculents, pains, céréales, légumineuses
+  "Pain blanc": { cal: 265, p: 9, c: 53, f: 3 },
+  "Pain complet": { cal: 247, p: 9, c: 48, f: 3 },
+  "Pain de mie": { cal: 270, p: 8, c: 49, f: 4 },
+  "Pain aux céréales": { cal: 260, p: 10, c: 44, f: 5 },
+  "Baguette": { cal: 270, p: 9, c: 55, f: 1.2 },
+  "Tortilla / wrap blé": { cal: 310, p: 8, c: 52, f: 8 },
+  "Wrap complet": { cal: 295, p: 9, c: 45, f: 8 },
+  "Galette de maïs / tortilla maïs": { cal: 218, p: 6, c: 45, f: 2.9 },
+  "Biscotte": { cal: 410, p: 11, c: 74, f: 7 },
+  "Cracotte": { cal: 380, p: 10, c: 78, f: 3 },
+  "Riz blanc cuit": { cal: 130, p: 3, c: 28, f: 0.3 },
+  "Riz complet cuit": { cal: 112, p: 2.6, c: 24, f: 0.9 },
+  "Riz basmati cuit": { cal: 121, p: 3, c: 25, f: 0.4 },
+  "Riz thaï cuit": { cal: 129, p: 2.7, c: 28, f: 0.3 },
+  "Pâtes cuites": { cal: 158, p: 5, c: 31, f: 1 },
+  "Pâtes complètes cuites": { cal: 140, p: 5.5, c: 27, f: 1.1 },
+  "Spaghetti cuits": { cal: 158, p: 5.8, c: 30.9, f: 0.9 },
+  "Semoule cuite": { cal: 112, p: 3.8, c: 23, f: 0.2 },
+  "Boulgour cuit": { cal: 83, p: 3, c: 19, f: 0.2 },
+  "Quinoa cuit": { cal: 120, p: 4.4, c: 22, f: 1.9 },
+  "Blé Ebly cuit": { cal: 124, p: 4.4, c: 25, f: 0.8 },
+  "Polenta cuite": { cal: 85, p: 1.8, c: 18, f: 0.7 },
+  "Pomme de terre cuite": { cal: 87, p: 2, c: 20, f: 0.1 },
+  "Pomme de terre vapeur": { cal: 80, p: 1.9, c: 18, f: 0.1 },
+  "Pommes de terre sautées": { cal: 160, p: 2.5, c: 24, f: 6 },
+  "Frites au four": { cal: 180, p: 3, c: 27, f: 7 },
+  "Patate douce cuite": { cal: 90, p: 2, c: 21, f: 0.1 },
+  "Purée de pommes de terre": { cal: 95, p: 2, c: 15, f: 3 },
+  "Gnocchis cuits": { cal: 150, p: 4, c: 30, f: 1 },
+  "Flocons d'avoine": { cal: 389, p: 17, c: 66, f: 7 },
+  "Muesli nature": { cal: 370, p: 10, c: 62, f: 8 },
+  "Corn flakes": { cal: 360, p: 7, c: 84, f: 1 },
+  "Lentilles cuites": { cal: 116, p: 9, c: 20, f: 0.4 },
+  "Lentilles corail cuites": { cal: 111, p: 8, c: 20, f: 0.4 },
+  "Pois chiches cuits": { cal: 164, p: 9, c: 27, f: 2.6 },
+  "Haricots rouges cuits": { cal: 127, p: 8.7, c: 22.8, f: 0.5 },
+  "Haricots blancs cuits": { cal: 110, p: 7.3, c: 19, f: 0.4 },
+  "Petits pois cuits": { cal: 84, p: 5.4, c: 14, f: 0.4 },
+  "Maïs doux": { cal: 96, p: 3.4, c: 19, f: 1.5 },
+
+  // Viandes, œufs, protéines sans poisson
+  "Blanc de poulet": { cal: 110, p: 23, c: 0, f: 2 },
+  "Poulet rôti": { cal: 190, p: 27, c: 0, f: 8 },
+  "Cuisse de poulet": { cal: 185, p: 19, c: 0, f: 12 },
+  "Escalope de dinde": { cal: 104, p: 22, c: 0, f: 1.5 },
+  "Jambon blanc": { cal: 107, p: 17, c: 1, f: 4 },
+  "Jambon cru": { cal: 230, p: 26, c: 0.5, f: 14 },
+  "Bacon": { cal: 430, p: 37, c: 1, f: 31 },
+  "Bœuf haché 5%": { cal: 137, p: 21, c: 0, f: 6 },
+  "Bœuf haché 15%": { cal: 215, p: 18, c: 0, f: 15 },
+  "Steak de bœuf": { cal: 180, p: 22, c: 0, f: 10 },
+  "Entrecôte": { cal: 250, p: 20, c: 0, f: 19 },
+  "Rumsteck": { cal: 155, p: 22, c: 0, f: 7 },
+  "Veau escalope": { cal: 110, p: 21, c: 0, f: 3 },
+  "Porc filet mignon": { cal: 145, p: 22, c: 0, f: 6 },
+  "Saucisse de Toulouse": { cal: 300, p: 15, c: 1, f: 26 },
+  "Merguez": { cal: 315, p: 15, c: 2, f: 27 },
+  "Œuf entier": { cal: 155, p: 13, c: 1, f: 11 },
+  "Blanc d'œuf": { cal: 52, p: 11, c: 0.7, f: 0.2 },
+  "Tofu ferme": { cal: 125, p: 13, c: 2, f: 7 },
+  "Tempeh": { cal: 190, p: 19, c: 9, f: 11 },
+  "Seitan": { cal: 140, p: 25, c: 5, f: 2 },
+
+  // Produits laitiers et fromages
+  "Fromage blanc 0%": { cal: 46, p: 8, c: 4, f: 0.2 },
+  "Fromage blanc 3%": { cal: 70, p: 7, c: 4, f: 3 },
+  "Skyr nature": { cal: 60, p: 10, c: 4, f: 0.2 },
+  "Yaourt nature": { cal: 61, p: 4, c: 7, f: 2 },
+  "Yaourt grec": { cal: 115, p: 6, c: 4, f: 8 },
+  "Petit suisse nature": { cal: 95, p: 8, c: 4, f: 5 },
+  "Lait demi-écrémé": { cal: 46, p: 3, c: 5, f: 2 },
+  "Lait écrémé": { cal: 34, p: 3.4, c: 5, f: 0.1 },
+  "Lait entier": { cal: 65, p: 3.2, c: 5, f: 3.6 },
+  "Lait d'amande sans sucre": { cal: 15, p: 0.5, c: 0.5, f: 1.2 },
+  "Lait de soja": { cal: 45, p: 3.5, c: 3, f: 2 },
+  "Gruyère": { cal: 413, p: 29, c: 0, f: 33 },
+  "Emmental": { cal: 380, p: 28, c: 0, f: 29 },
+  "Comté": { cal: 420, p: 27, c: 0, f: 34 },
+  "Parmesan": { cal: 431, p: 38, c: 4, f: 29 },
+  "Mozzarella": { cal: 254, p: 18, c: 2, f: 20 },
+  "Feta": { cal: 264, p: 14, c: 4, f: 21 },
+  "Chèvre frais": { cal: 220, p: 13, c: 2, f: 18 },
+  "Camembert": { cal: 300, p: 20, c: 1, f: 24 },
+  "Brie": { cal: 334, p: 21, c: 0.5, f: 28 },
+  "Raclette": { cal: 360, p: 24, c: 1, f: 29 },
+  "Kiri / fromage fondu": { cal: 280, p: 9, c: 6, f: 25 },
+
+  // Fruits
+  "Banane": { cal: 89, p: 1, c: 23, f: 0.3 },
+  "Pomme": { cal: 52, p: 0.3, c: 14, f: 0.2 },
+  "Poire": { cal: 57, p: 0.4, c: 15, f: 0.1 },
+  "Orange": { cal: 47, p: 0.9, c: 12, f: 0.1 },
+  "Clémentine": { cal: 47, p: 0.8, c: 12, f: 0.2 },
+  "Kiwi": { cal: 61, p: 1.1, c: 15, f: 0.5 },
+  "Fraise": { cal: 32, p: 0.7, c: 8, f: 0.3 },
+  "Framboise": { cal: 52, p: 1.2, c: 12, f: 0.7 },
+  "Myrtille": { cal: 57, p: 0.7, c: 14, f: 0.3 },
+  "Raisin": { cal: 69, p: 0.7, c: 18, f: 0.2 },
+  "Pastèque": { cal: 30, p: 0.6, c: 8, f: 0.2 },
+  "Melon": { cal: 34, p: 0.8, c: 8, f: 0.2 },
+  "Ananas": { cal: 50, p: 0.5, c: 13, f: 0.1 },
+  "Mangue": { cal: 60, p: 0.8, c: 15, f: 0.4 },
+  "Pêche": { cal: 39, p: 0.9, c: 10, f: 0.3 },
+  "Nectarine": { cal: 44, p: 1.1, c: 11, f: 0.3 },
+  "Abricot": { cal: 48, p: 1.4, c: 11, f: 0.4 },
+  "Cerise": { cal: 63, p: 1.1, c: 16, f: 0.2 },
+  "Prune": { cal: 46, p: 0.7, c: 11, f: 0.3 },
+  "Compote sans sucre": { cal: 55, p: 0.2, c: 13, f: 0.1 },
+  "Datte": { cal: 282, p: 2.5, c: 75, f: 0.4 },
+  "Raisins secs": { cal: 299, p: 3, c: 79, f: 0.5 },
+
+  // Légumes
+  "Carotte": { cal: 41, p: 0.9, c: 10, f: 0.2 },
+  "Brocoli": { cal: 34, p: 3, c: 7, f: 0.4 },
+  "Épinards": { cal: 23, p: 3, c: 4, f: 0.4 },
+  "Tomate": { cal: 18, p: 0.9, c: 4, f: 0.2 },
+  "Courgette": { cal: 17, p: 1.2, c: 3, f: 0.3 },
+  "Poivron": { cal: 31, p: 1, c: 7, f: 0.3 },
+  "Champignons": { cal: 22, p: 3, c: 4, f: 0.3 },
+  "Avocat": { cal: 160, p: 2, c: 9, f: 15 },
+  "Concombre": { cal: 15, p: 0.7, c: 3.6, f: 0.1 },
+  "Salade verte": { cal: 15, p: 1.4, c: 2.9, f: 0.2 },
+  "Haricots verts": { cal: 31, p: 1.8, c: 7, f: 0.1 },
+  "Chou-fleur": { cal: 25, p: 1.9, c: 5, f: 0.3 },
+  "Chou rouge": { cal: 31, p: 1.4, c: 7, f: 0.2 },
+  "Chou blanc": { cal: 25, p: 1.3, c: 6, f: 0.1 },
+  "Aubergine": { cal: 25, p: 1, c: 6, f: 0.2 },
+  "Oignon": { cal: 40, p: 1.1, c: 9, f: 0.1 },
+  "Ail": { cal: 149, p: 6, c: 33, f: 0.5 },
+  "Betterave cuite": { cal: 44, p: 1.7, c: 10, f: 0.2 },
+  "Asperges": { cal: 20, p: 2.2, c: 3.9, f: 0.1 },
+  "Poireau": { cal: 61, p: 1.5, c: 14, f: 0.3 },
+  "Céleri branche": { cal: 16, p: 0.7, c: 3, f: 0.2 },
+  "Radis": { cal: 16, p: 0.7, c: 3.4, f: 0.1 },
+  "Endive": { cal: 17, p: 1.3, c: 3.4, f: 0.2 },
+  "Potiron / courge": { cal: 26, p: 1, c: 6.5, f: 0.1 },
+  "Butternut cuite": { cal: 45, p: 1, c: 12, f: 0.1 },
+
+  // Matières grasses, oléagineux, condiments
+  "Amandes": { cal: 579, p: 21, c: 22, f: 50 },
+  "Noix": { cal: 654, p: 15, c: 14, f: 65 },
+  "Noisettes": { cal: 628, p: 15, c: 17, f: 61 },
+  "Noix de cajou": { cal: 553, p: 18, c: 30, f: 44 },
+  "Pistaches": { cal: 560, p: 20, c: 28, f: 45 },
+  "Beurre de cacahuète": { cal: 588, p: 25, c: 20, f: 50 },
+  "Graines de chia": { cal: 486, p: 17, c: 42, f: 31 },
+  "Graines de courge": { cal: 559, p: 30, c: 11, f: 49 },
+  "Huile d'olive": { cal: 884, p: 0, c: 0, f: 100 },
+  "Huile de colza": { cal: 884, p: 0, c: 0, f: 100 },
+  "Beurre": { cal: 717, p: 0.9, c: 0.1, f: 81 },
+  "Crème fraîche 15%": { cal: 165, p: 2.8, c: 4, f: 15 },
+  "Crème fraîche 30%": { cal: 300, p: 2.5, c: 3, f: 30 },
+  "Mayonnaise": { cal: 680, p: 1, c: 1, f: 75 },
+  "Ketchup": { cal: 112, p: 1.3, c: 26, f: 0.2 },
+  "Moutarde": { cal: 66, p: 4, c: 6, f: 4 },
+  "Sauce soja": { cal: 53, p: 8, c: 5, f: 0.6 },
+  "Houmous": { cal: 166, p: 8, c: 14, f: 10 },
+
+  // Snacks et produits courants
+  "Chocolat noir 70%": { cal: 598, p: 8, c: 46, f: 43 },
+  "Chocolat au lait": { cal: 535, p: 7, c: 59, f: 30 },
+  "Biscuits secs": { cal: 450, p: 6, c: 70, f: 16 },
+  "Pain au chocolat": { cal: 420, p: 8, c: 45, f: 23 },
+  "Croissant": { cal: 406, p: 8, c: 45, f: 21 },
+  "Barre céréales": { cal: 390, p: 6, c: 65, f: 12 },
+  "Chips": { cal: 536, p: 6, c: 53, f: 35 },
+  "Pop-corn nature": { cal: 375, p: 11, c: 74, f: 4 },
+  "Pizza margherita": { cal: 250, p: 11, c: 32, f: 9 },
+  "Burger classique": { cal: 295, p: 15, c: 26, f: 15 },
+  "Nuggets de poulet": { cal: 295, p: 15, c: 16, f: 19 },
+  "Lasagnes bolognaise": { cal: 165, p: 9, c: 13, f: 9 },
+  "Quiche lorraine": { cal: 330, p: 11, c: 22, f: 23 },
+  "Soupe de légumes": { cal: 40, p: 1.5, c: 7, f: 1 },
+  "Couscous légumes": { cal: 130, p: 4, c: 22, f: 3 },
+  "Taboulé": { cal: 155, p: 4, c: 23, f: 5 },
+};
+
+// ─── SPORT DATABASE (kcal/min/kg) ────────────────────────────────────────────
+const SPORT_DB = {
+  // Coefficients kcal/min/kg = MET × 3.5 / 200, intensité moyenne
+  "Course à pied": 0.1715,       // ~9.8 MET
+  "Vélo": 0.1400,                // ~8.0 MET
+  "Natation": 0.1050,            // ~6.0 MET
+  "Musculation": 0.1050,         // ~6.0 MET
+  "HIIT": 0.1575,                // ~9.0 MET
+  "Marche rapide": 0.0761,       // ~4.35 MET
+  "Yoga": 0.0525,                // ~3.0 MET
+  "Football": 0.1225,            // ~7.0 MET
+  "Tennis": 0.1225,              // ~7.0 MET
+  "Corde à sauter": 0.1925,      // ~11.0 MET
+  "Elliptique": 0.0875,          // ~5.0 MET
+  "Rameur": 0.1225,              // ~7.0 MET
+  "Escaliers": 0.1400,           // ~8.0 MET
+  "Boxe": 0.1575,                // ~9.0 MET
+  "Pilates": 0.0613,             // ~3.5 MET
+  "Basketball": 0.1400,
+  "Rugby": 0.1575,
+  "Randonnée": 0.1050,
+  "Marche normale": 0.0613,
+  "Vélo appartement": 0.1225,
+};
+
+const ACTIVITY_LEVELS = [
+  { label: "Sédentaire (peu ou pas d'exercice)",  value: "1.2"   },
+  { label: "Légèrement actif (1-3j/sem)",          value: "1.375" },
+  { label: "Modérément actif (3-5j/sem)",          value: "1.55"  },
+  { label: "Très actif (6-7j/sem)",                value: "1.725" },
+  { label: "Extrêmement actif (athlète)",          value: "1.9"   },
+];
+
+// ─── DETAILED MEAL SUGGESTIONS (no fish) ─────────────────────────────────────
+const MEAL_PLANS = [
+  {
+    name: "🍗 Poulet grillé, riz & légumes rôtis",
+    cal: 520,
+    ingredients: [
+      { item: "Blanc de poulet", qty: "150g", prep: "assaisonné ail, paprika, herbes de Provence" },
+      { item: "Riz blanc", qty: "100g cru (≈ 260g cuit)", prep: "cuit à l'eau salée" },
+      { item: "Brocoli + courgette", qty: "200g", prep: "rôtis au four 200°C, 20 min, huile d'olive" },
+      { item: "Huile d'olive", qty: "1 càs (10g)", prep: "pour la cuisson et l'assaisonnement" },
+    ],
+    cuisson: "Gril ou poêle antiadhésive 12 min à feu moyen. Four 200°C pour les légumes.",
+    macros: { p: 42, c: 52, f: 10 },
+    tips: "Marine le poulet 30 min au frigo pour plus de saveur.",
+  },
+  {
+    name: "🥚 Omelette protéinée & pain complet",
+    cal: 430,
+    ingredients: [
+      { item: "Œufs entiers", qty: "3 œufs (180g)", prep: "battus avec sel, poivre, ciboulette" },
+      { item: "Jambon blanc", qty: "80g", prep: "coupé en dés" },
+      { item: "Champignons", qty: "100g", prep: "sautés à la poêle 5 min" },
+      { item: "Pain complet", qty: "2 tranches (80g)", prep: "grillé au toaster" },
+      { item: "Fromage blanc 0%", qty: "100g", prep: "en accompagnement" },
+    ],
+    cuisson: "Faire revenir champignons + jambon 3 min. Ajouter les œufs battus, cuire à feu doux 4 min en repliant l'omelette.",
+    macros: { p: 38, c: 34, f: 14 },
+    tips: "Tu peux ajouter des épinards frais ou des poivrons pour les vitamines.",
+  },
+  {
+    name: "🥩 Bœuf haché, patate douce & salade",
+    cal: 490,
+    ingredients: [
+      { item: "Bœuf haché 5%", qty: "150g", prep: "façonné en galette ou émietté à la poêle" },
+      { item: "Patate douce", qty: "200g", prep: "en cubes, cuite vapeur 20 min ou four 200°C" },
+      { item: "Épinards frais", qty: "80g", prep: "en salade, crus ou tombés à la poêle 2 min" },
+      { item: "Tomate", qty: "100g", prep: "en tranches" },
+      { item: "Huile d'olive", qty: "1 càc (5g)", prep: "filet sur la salade" },
+    ],
+    cuisson: "Poêle très chaude pour le bœuf, 5 min de chaque côté. Saler, poivrer. Patate douce vapeur ou micro-ondes 8 min.",
+    macros: { p: 36, c: 48, f: 9 },
+    tips: "Ajouter du cumin ou du paprika fumé sur le bœuf pour varier.",
+  },
+];
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().slice(0, 10); }
+function calcBMI(weight, height) {
+  const h = parseFloat(height) / 100;
+  return h > 0 ? (parseFloat(weight) / (h * h)).toFixed(1) : null;
+}
+function getBMICat(bmi) {
+  const b = parseFloat(bmi);
+  if (b < 18.5) return { label: "Insuffisance pondérale", color: "#3b82f6" };
+  if (b < 25)   return { label: "Poids normal ✓",         color: "#10b981" };
+  if (b < 30)   return { label: "Surpoids",               color: "#f59e0b" };
+  return              { label: "Obésité",                 color: "#ef4444" };
+}
+function calcTDEE({ weight, height, age, sex, activity }) {
+  if (!weight || !height || !age) return null;
+  const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
+  const bmr = sex === "H" ? 10*w + 6.25*h - 5*a + 5 : 10*w + 6.25*h - 5*a - 161;
+  return Math.round(bmr * parseFloat(activity));
+}
+function calcMealTotals(items) {
+  return items.reduce((acc, i) => ({
+    cal: acc.cal + (i.calories || 0),
+    p:   acc.p   + (i.macros?.p || 0),
+    c:   acc.c   + (i.macros?.c || 0),
+    f:   acc.f   + (i.macros?.f || 0),
+  }), { cal: 0, p: 0, c: 0, f: 0 });
+}
+function calcSportBurn(sports, weight) {
+  const w = parseFloat(weight) || 70;
+  return Math.round(sports.reduce((s, sp) => s + (SPORT_DB[sp.type] || 0.01) * w * sp.minutes, 0));
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+const store = {
+  async get(key) {
+    try {
+      if (window.storage?.get) {
+        const r = await window.storage.get(key);
+        return r ? JSON.parse(r.value) : null;
+      }
+      const raw = window.localStorage?.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+  async set(key, val) {
+    try {
+      const json = JSON.stringify(val);
+      if (window.storage?.set) await window.storage.set(key, json);
+      else window.localStorage?.setItem(key, json);
+    } catch {}
+  },
+  async del(key) {
+    try {
+      if (window.storage?.delete) await window.storage.delete(key);
+      else window.localStorage?.removeItem(key);
+    } catch {}
+  },
+};
+
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+const C = {
+  bg:      "#0d0d12",
+  surface: "#16161f",
+  card:    "#1e1e2e",
+  accent:  "#818cf8",
+  indigo:  "#6366f1",
+  green:   "#22c55e",
+  red:     "#ef4444",
+  orange:  "#f97316",
+  yellow:  "#eab308",
+  text:    "#e2e8f0",
+  muted:   "#64748b",
+  border:  "#2d2d44",
+};
+
+const css = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:${C.bg};color:${C.text};font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+input,select,button,textarea{font-family:'Inter',sans-serif;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:${C.border};border-radius:3px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.fade{animation:fadeUp .25s ease;}
+@keyframes pop{0%{transform:scale(.95);}60%{transform:scale(1.04);}100%{transform:scale(1);}}
+.pop{animation:pop .2s ease;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+`;
+
+// ─── UI ATOMS ─────────────────────────────────────────────────────────────────
+function Card({ children, sx = {}, glow }) {
+  return (
+    <div style={{
+      background: C.card, borderRadius: 18, padding: "16px",
+      border: `1px solid ${glow ? C.accent + "55" : C.border}`,
+      boxShadow: glow ? `0 0 20px ${C.accent}18` : "none",
+      marginBottom: 14, ...sx
+    }}>{children}</div>
+  );
+}
+function SectionTitle({ children }) {
+  return <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 12 }}>{children}</div>;
+}
+function Lbl({ children }) {
+  return <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{children}</div>;
+}
+function Inp({ label, value, onChange, type = "text", placeholder, unit, step, min, max }) {
+  return (
+    <div style={{ marginBottom: 11 }}>
+      {label && <Lbl>{label}</Lbl>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input value={value} onChange={e => onChange(e.target.value)}
+          type={type} placeholder={placeholder} step={step} min={min} max={max}
+          style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, padding: "10px 12px", fontSize: 14, outline: "none", WebkitAppearance: "none" }} />
+        {unit && <span style={{ color: C.muted, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap" }}>{unit}</span>}
+      </div>
+    </div>
+  );
+}
+function Sel({ label, value, onChange, options }) {
+  return (
+    <div style={{ marginBottom: 11 }}>
+      {label && <Lbl>{label}</Lbl>}
+      <select value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, padding: "10px 12px", fontSize: 14, outline: "none", WebkitAppearance: "none" }}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+function Btn({ children, onClick, color = C.accent, outline, small, full, disabled }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      background: outline ? "transparent" : color, color: outline ? color : "#fff",
+      border: `1.5px solid ${color}55`, borderRadius: 10,
+      padding: small ? "6px 13px" : "11px 18px",
+      fontSize: small ? 12 : 14, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.4 : 1, transition: "opacity .15s",
+      width: full ? "100%" : undefined, letterSpacing: "0.02em",
+    }}>{children}</button>
+  );
+}
+function Alert({ type, msg }) {
+  const m = {
+    ok:   { bg: "#22c55e18", bd: "#22c55e44", c: C.green,  icon: "✅" },
+    warn: { bg: "#f9731618", bd: "#f9731644", c: C.orange, icon: "⚠️" },
+    bad:  { bg: "#ef444418", bd: "#ef444444", c: C.red,    icon: "🚨" },
+    tip:  { bg: "#6366f118", bd: "#6366f144", c: C.accent, icon: "💡" },
+  }[type] || {};
+  return (
+    <div style={{ background: m.bg, border: `1px solid ${m.bd}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 9, color: m.c, fontSize: 13, fontWeight: 500, marginBottom: 12 }}>
+      <span>{m.icon}</span><span>{msg}</span>
+    </div>
+  );
+}
+function CircleRing({ value, max, size = 90, stroke = 9, color = C.accent, label, sub }) {
+  const r = (size - stroke) / 2, circ = 2 * Math.PI * r;
+  const pct = Math.min(Math.max(value / max, 0), 1);
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={circ - pct * circ} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: C.text }}>{label}</span>
+        {sub && <span style={{ fontSize: 9, color: C.muted }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+function MacroBar({ label, value, max, color }) {
+  const pct = Math.min((value / Math.max(max, 1)) * 100, 100);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+        <span style={{ color: C.muted, fontWeight: 500 }}>{label}</span>
+        <span style={{ color, fontWeight: 700 }}>{Math.round(value)}g <span style={{ color: C.muted, fontWeight: 400 }}>/ {max}g</span></span>
+      </div>
+      <div style={{ height: 5, background: C.border, borderRadius: 99 }}>
+        <div style={{ width: `${pct}%`, height: 5, background: color, borderRadius: 99, transition: "width .5s" }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab]             = useState("dash");
+  const [profile, setProfile]     = useState({ weight: "", height: "", age: "", sex: "H", activity: "1.55", deficit: "300", goalCal: "" });
+  const [meals, setMeals]         = useState({ midi: [], soir: [] });
+  const [sport, setSport]         = useState([]);
+  const [weightLog, setWeightLog] = useState([]);
+  const [calHist, setCalHist]     = useState([]);
+  const [ready, setReady]         = useState(false);
+
+  // ── Load on mount ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const p  = await store.get("profile");
+      const m  = await store.get(`meals-${today()}`);
+      const s  = await store.get(`sport-${today()}`);
+      const wl = await store.get("weight-log");
+      const ch = await store.get("calorie-history");
+      if (p)  setProfile(p);
+      if (m)  setMeals(m);
+      if (s)  setSport(s);
+      if (wl) setWeightLog(wl);
+      // Seed dummy history if empty so chart is always visible
+      if (ch && ch.length > 0) {
+        setCalHist(ch);
+      } else {
+        const tdee = p ? calcTDEE(p) : 1800;
+        const goal = tdee ? tdee - parseInt(p?.deficit || 300) : 1500;
+        const seed = [];
+        for (let i = 13; i >= 1; i--) {
+          const d = new Date(); d.setDate(d.getDate() - i);
+          const dd = d.toISOString().slice(0, 10);
+          const net = goal + Math.round((Math.random() - 0.5) * 300);
+          const burn = Math.round(Math.random() * 250);
+          seed.push({ date: dd, consumed: net + burn, burned: burn, net });
+        }
+        setCalHist(seed);
+        store.set("calorie-history", seed);
+      }
+      setReady(true);
+    })();
+  }, []);
+
+  // ── Auto-save ───────────────────────────────────────────────────────────────
+  useEffect(() => { if (ready) store.set("profile", profile); }, [profile, ready]);
+  useEffect(() => { if (ready) store.set(`meals-${today()}`, meals); }, [meals, ready]);
+  useEffect(() => { if (ready) store.set(`sport-${today()}`, sport); }, [sport, ready]);
+
+  // ── Update calorie history for today ───────────────────────────────────────
+  useEffect(() => {
+    if (!ready) return;
+    const mT = calcMealTotals(meals.midi);
+    const sT = calcMealTotals(meals.soir);
+    const consumed = mT.cal + sT.cal;
+    const burned = calcSportBurn(sport, profile.weight);
+    const net = consumed - burned;
+    setCalHist(prev => {
+      const filtered = prev.filter(x => x.date !== today());
+      const next = [...filtered, { date: today(), consumed, burned, net }]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-30);
+      store.set("calorie-history", next);
+      return next;
+    });
+  }, [meals, sport, ready]);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const tdee     = calcTDEE(profile);
+  const deficit  = parseInt(profile.deficit) || 300;
+  const goalCal  = parseInt(profile.goalCal) || (tdee ? tdee - deficit : 2000);
+  const midiT    = calcMealTotals(meals.midi);
+  const soirT    = calcMealTotals(meals.soir);
+  const sportBurn= calcSportBurn(sport, profile.weight);
+  const consumed = midiT.cal + soirT.cal;
+  const net      = consumed - sportBurn;
+  const remaining= goalCal - net;
+  const allM     = { p: midiT.p+soirT.p, c: midiT.c+soirT.c, f: midiT.f+soirT.f };
+  const w        = parseFloat(profile.weight) || 70;
+  const macroTgt = { p: Math.round(w*2), f: Math.round(w*1), c: Math.max(Math.round((goalCal - w*2*4 - w*1*9)/4), 50) };
+
+  const NAV = [
+    { id: "dash",    icon: "⚡", label: "Bilan"  },
+    { id: "meals",   icon: "🍽️", label: "Repas"  },
+    { id: "sport",   icon: "🏃", label: "Sport"  },
+    { id: "weight",  icon: "📈", label: "Poids"  },
+    { id: "profile", icon: "⚙️", label: "Profil" },
+  ];
+
+  return (
+    <div style={{ maxWidth: 430, margin: "0 auto", minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
+      <style>{css}</style>
+
+      {/* ── Header ── */}
+      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "14px 18px 12px", position: "sticky", top: 0, zIndex: 99, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.04em" }}>
+            Nutri<span style={{ color: C.accent }}>Track</span>
+          </div>
+          <div style={{ fontSize: 10, color: C.muted }}>{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: remaining >= 0 ? C.green : C.red, lineHeight: 1 }}>
+            {remaining >= 0 ? `+${remaining}` : remaining}
+          </div>
+          <div style={{ fontSize: 10, color: C.muted }}>kcal restantes</div>
+        </div>
+      </div>
+
+      {/* ── Page ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 90px" }}>
+        {tab === "dash"    && <PageDash {...{ net, consumed, sportBurn, goalCal, remaining, midiT, soirT, allM, macroTgt, calHist, profile, weightLog }} />}
+        {tab === "meals"   && <PageMeals {...{ meals, setMeals, midiT, soirT, remaining, goalCal }} />}
+        {tab === "sport"   && <PageSport {...{ sport, setSport, profile }} />}
+        {tab === "weight"  && <PageWeight {...{ weightLog, setWeightLog, profile }} />}
+        {tab === "profile" && <PageProfile {...{ profile, setProfile, tdee, deficit, goalCal }} />}
+      </div>
+
+      {/* ── Bottom Nav ── */}
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: C.surface, borderTop: `1px solid ${C.border}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom,6px)" }}>
+        {NAV.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, padding: "10px 0 6px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, color: tab === t.id ? C.accent : C.muted }}>
+            <span style={{ fontSize: 19 }}>{t.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: tab === t.id ? 700 : 400 }}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── PAGE : DASHBOARD ─────────────────────────────────────────────────────────
+function PageDash({ net, consumed, sportBurn, goalCal, remaining, midiT, soirT, allM, macroTgt, calHist, profile, weightLog }) {
+  const pct  = Math.min((net / goalCal) * 100, 100);
+  const bmi  = profile.weight && profile.height ? calcBMI(profile.weight, profile.height) : null;
+  const bmiC = bmi ? getBMICat(bmi) : null;
+
+  // Weight chart data from last 14 entries
+  const wData = weightLog.slice(-14);
+
+  return (
+    <div className="fade">
+      {remaining < 0
+        ? <Alert type="bad"  msg={`Dépassement de ${Math.abs(remaining)} kcal — objectif non respecté aujourd'hui`} />
+        : remaining < 150
+        ? <Alert type="warn" msg={`Plus que ${remaining} kcal — attention au prochain repas !`} />
+        : <Alert type="ok"   msg={`Déficit respecté ✓ — encore ${remaining} kcal disponibles`} />}
+
+      {/* ── Anneau principal ── */}
+      <Card glow>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <CircleRing value={net} max={goalCal} size={100} stroke={10}
+            color={remaining >= 0 ? C.accent : C.red}
+            label={`${Math.round(pct)}%`} sub="objectif" />
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[
+              { l: "Consommé",  v: consumed,    u: "kcal", c: "#a5b4fc" },
+              { l: "Sport 🔥",  v: `-${sportBurn}`, u: "kcal", c: C.green  },
+              { l: "Net",       v: net,          u: "kcal", c: C.text   },
+              { l: "Objectif",  v: goalCal,      u: "kcal", c: C.muted  },
+            ].map(s => (
+              <div key={s.l}>
+                <div style={{ fontSize: 10, color: C.muted }}>{s.l}</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: s.c, lineHeight: 1.2 }}>{s.v}</div>
+                <div style={{ fontSize: 10, color: C.muted }}>{s.u}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Repas ── */}
+      <Card>
+        <SectionTitle>Repas du jour</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[{ l: "🍱 Déjeuner", t: midiT }, { l: "🌙 Dîner", t: soirT }].map(r => (
+            <div key={r.l} style={{ background: C.surface, borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>{r.l}</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: C.text, lineHeight: 1 }}>{r.t.cal}</div>
+              <div style={{ fontSize: 11, color: C.muted }}>kcal</div>
+              <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>{r.t.p}g P · {r.t.c}g G · {r.t.f}g L</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* ── Macros ── */}
+      <Card>
+        <SectionTitle>Macronutriments</SectionTitle>
+        <MacroBar label="🥩 Protéines"  value={allM.p} max={macroTgt.p} color="#a78bfa" />
+        <MacroBar label="🌾 Glucides"   value={allM.c} max={macroTgt.c} color="#f59e0b" />
+        <MacroBar label="🧈 Lipides"    value={allM.f} max={macroTgt.f} color="#22c55e" />
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
+          Cibles : {macroTgt.p}g protéines · {macroTgt.c}g glucides · {macroTgt.f}g lipides
+        </div>
+      </Card>
+
+      {/* ── Graphique historique calories ── */}
+      <Card>
+        <SectionTitle>Historique calories (30j)</SectionTitle>
+        {calHist.length === 0 ? (
+          <div style={{ color: C.muted, fontSize: 13, textAlign: "center", padding: 20 }}>Aucune donnée encore</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={calHist} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gNet" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={C.accent} stopOpacity={0.4} />
+                  <stop offset="100%" stopColor={C.accent} stopOpacity={0}   />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+              <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.muted }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 9, fill: C.muted }} domain={["auto", "auto"]} />
+              <Tooltip
+                contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11 }}
+                labelStyle={{ color: C.muted }}
+                formatter={(v, n) => [`${v} kcal`, n === "net" ? "Net" : n === "burned" ? "Brûlées sport" : "Consommées"]}
+              />
+              <ReferenceLine y={goalCal} stroke={C.green} strokeDasharray="5 3" strokeWidth={1.5} label={{ value: "Objectif", position: "insideTopRight", fontSize: 9, fill: C.green }} />
+              <Area type="monotone" dataKey="net" stroke={C.accent} fill="url(#gNet)" strokeWidth={2} dot={false} name="net" />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
+
+      {/* ── Graphique poids ── */}
+      {wData.length > 1 && (
+        <Card>
+          <SectionTitle>Évolution du poids</SectionTitle>
+          <ResponsiveContainer width="100%" height={140}>
+            <LineChart data={wData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+              <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.muted }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 9, fill: C.muted }} domain={["auto", "auto"]} unit="kg" />
+              <Tooltip
+                contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11 }}
+                formatter={v => [`${v} kg`, "Poids"]}
+              />
+              <Line type="monotone" dataKey="weight" stroke={C.green} strokeWidth={2.5}
+                dot={{ fill: C.green, r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* ── IMC ── */}
+      {bmi && (
+        <Card>
+          <SectionTitle>IMC</SectionTitle>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 42, fontWeight: 900, color: bmiC.color, lineHeight: 1 }}>{bmi}</div>
+              <div style={{ fontSize: 14, color: bmiC.color, fontWeight: 600, marginTop: 4 }}>{bmiC.label}</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              {[
+                { r: "< 18.5",    l: "Insuffisance", c: "#3b82f6" },
+                { r: "18.5–24.9", l: "Normal ✓",      c: C.green   },
+                { r: "25–29.9",   l: "Surpoids",      c: C.yellow  },
+                { r: "≥ 30",      l: "Obésité",       c: C.red     },
+              ].map(b => (
+                <div key={b.l} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
+                  <span style={{ color: C.muted }}>{b.r}</span>
+                  <span style={{ color: b.c, fontWeight: 600 }}>{b.l}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── PAGE : REPAS ─────────────────────────────────────────────────────────────
+function PageMeals({ meals, setMeals, midiT, soirT, remaining, goalCal }) {
+  const [slot, setSlot]       = useState("midi");
+  const [mode, setMode]       = useState("db");
+  const [search, setSearch]   = useState("");
+  const [selFood, setSelFood] = useState("");
+  const [qty, setQty]         = useState("");
+  const [mName, setMName]     = useState("");
+  const [mCal, setMCal]       = useState("");
+  const [mP, setMP]           = useState("");
+  const [mC, setMC]           = useState("");
+  const [mF, setMF]           = useState("");
+  const [showSuggest, setShowSuggest] = useState(false);
+
+  const filtered = Object.keys(FOOD_DB).filter(k => search.length > 0 && k.toLowerCase().includes(search.toLowerCase()));
+  const slotT = slot === "midi" ? midiT : soirT;
+  const preview = selFood && qty ? Math.round(FOOD_DB[selFood]?.cal * parseFloat(qty) / 100) : null;
+
+  function addDb() {
+    if (!selFood || !qty) return;
+    const db = FOOD_DB[selFood];
+    const q  = parseFloat(qty) / 100;
+    const item = { id: Date.now(), name: selFood, qty: parseFloat(qty), calories: Math.round(db.cal * q),
+      macros: { p: Math.round(db.p * q), c: Math.round(db.c * q), f: Math.round(db.f * q) } };
+    setMeals(prev => ({ ...prev, [slot]: [...prev[slot], item] }));
+    setSelFood(""); setQty(""); setSearch("");
+  }
+  function addManual() {
+    if (!mCal) return;
+    const item = { id: Date.now(), name: mName || "Aliment", calories: parseInt(mCal),
+      macros: { p: parseInt(mP)||0, c: parseInt(mC)||0, f: parseInt(mF)||0 } };
+    setMeals(prev => ({ ...prev, [slot]: [...prev[slot], item] }));
+    setMName(""); setMCal(""); setMP(""); setMC(""); setMF("");
+  }
+  function remove(s, id) { setMeals(prev => ({ ...prev, [s]: prev[s].filter(i => i.id !== id) })); }
+
+  return (
+    <div className="fade">
+      {/* Slot toggle */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        {[{ id: "midi", l: "🍱 Déjeuner", t: midiT.cal }, { id: "soir", l: "🌙 Dîner", t: soirT.cal }].map(s => (
+          <button key={s.id} onClick={() => setSlot(s.id)} style={{
+            flex: 1, padding: "12px", borderRadius: 14, cursor: "pointer",
+            border: `1.5px solid ${slot === s.id ? C.accent : C.border}`,
+            background: slot === s.id ? C.accent + "18" : C.surface,
+            color: slot === s.id ? C.accent : C.muted, fontSize: 13, fontWeight: 700
+          }}>
+            {s.l}
+            <div style={{ fontSize: 11, fontWeight: 400, marginTop: 2 }}>{s.t} kcal</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Mode toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <Btn onClick={() => setMode("db")}     small color={mode === "db"     ? C.accent : C.muted} outline={mode !== "db"    }>📋 Base alimentaire</Btn>
+        <Btn onClick={() => setMode("manual")} small color={mode === "manual" ? C.accent : C.muted} outline={mode !== "manual"}>✏️ Manuel</Btn>
+      </div>
+
+      {/* DB mode */}
+      {mode === "db" && (
+        <Card>
+          <Inp label="Chercher un aliment" value={search} onChange={v => { setSearch(v); setSelFood(""); }} placeholder="ex: poulet, riz, bœuf…" />
+          {filtered.length > 0 && (
+            <div style={{ maxHeight: 200, overflowY: "auto", borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 10 }}>
+              {filtered.slice(0, 25).map(f => (
+                <div key={f} onClick={() => { setSelFood(f); setSearch(f); }}
+                  style={{ padding: "9px 12px", cursor: "pointer", background: selFood === f ? C.accent + "22" : "transparent",
+                    fontSize: 13, color: selFood === f ? C.accent : C.text, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{f}</span>
+                  <span style={{ color: C.muted, fontSize: 11 }}>{FOOD_DB[f].cal} kcal/100g</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {selFood && (
+            <div style={{ fontSize: 12, color: C.accent, fontWeight: 600, marginBottom: 8 }}>
+              ✓ {selFood} — {FOOD_DB[selFood]?.cal} kcal/100g | P:{FOOD_DB[selFood]?.p}g G:{FOOD_DB[selFood]?.c}g L:{FOOD_DB[selFood]?.f}g
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}><Inp label="Quantité" value={qty} onChange={setQty} type="number" placeholder="200" unit="g" /></div>
+            {preview !== null && (
+              <div style={{ marginBottom: 11, padding: "10px 12px", background: C.accent + "18", borderRadius: 10, fontSize: 13, color: C.accent, fontWeight: 800, whiteSpace: "nowrap" }}>
+                ≈ {preview} kcal
+              </div>
+            )}
+          </div>
+          <Btn onClick={addDb} disabled={!selFood || !qty} full>＋ Ajouter</Btn>
+        </Card>
+      )}
+
+      {/* Manual mode */}
+      {mode === "manual" && (
+        <Card>
+          <Inp label="Nom du plat" value={mName} onChange={setMName} placeholder="Sandwich jambon…" />
+          <Inp label="Calories" value={mCal} onChange={setMCal} type="number" placeholder="350" unit="kcal" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <Inp label="Protéines" value={mP} onChange={setMP} type="number" placeholder="0" unit="g" />
+            <Inp label="Glucides"  value={mC} onChange={setMC} type="number" placeholder="0" unit="g" />
+            <Inp label="Lipides"   value={mF} onChange={setMF} type="number" placeholder="0" unit="g" />
+          </div>
+          <Btn onClick={addManual} disabled={!mCal} full>＋ Ajouter</Btn>
+        </Card>
+      )}
+
+      {/* Items list */}
+      {meals[slot].length > 0 && (
+        <Card>
+          <SectionTitle>{slot === "midi" ? "🍱 Déjeuner" : "🌙 Dîner"} — {slotT.cal} kcal</SectionTitle>
+          {meals[slot].map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}{item.qty ? <span style={{ color: C.muted, fontSize: 12 }}> ({item.qty}g)</span> : ""}</div>
+                <div style={{ fontSize: 11, color: C.muted }}>{item.macros.p}g P · {item.macros.c}g G · {item.macros.f}g L</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{item.calories} kcal</span>
+                <button onClick={() => remove(slot, item.id)} style={{ background: C.red + "22", border: "none", borderRadius: 7, color: C.red, width: 28, height: 28, cursor: "pointer", fontSize: 14 }}>✕</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {/* Suggestions */}
+      <button onClick={() => setShowSuggest(v => !v)}
+        style={{ width: "100%", background: C.indigo + "18", border: `1px solid ${C.indigo}44`, borderRadius: 14, padding: "13px", color: C.accent, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 14 }}>
+        💡 {showSuggest ? "Masquer les idées repas" : `3 idées repas pour ce soir (≈${remaining > 0 ? remaining : goalCal} kcal restantes)`}
+      </button>
+
+      {showSuggest && MEAL_PLANS.map((plan, i) => (
+        <Card key={i} sx={{ border: `1px solid ${C.indigo}44` }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 8 }}>{plan.name}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <span style={{ background: C.accent + "22", color: C.accent, borderRadius: 8, padding: "2px 10px", fontSize: 12, fontWeight: 700 }}>{plan.cal} kcal</span>
+            <span style={{ background: "#a78bfa22", color: "#a78bfa", borderRadius: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>P {plan.macros.p}g</span>
+            <span style={{ background: "#f59e0b22", color: "#f59e0b", borderRadius: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>G {plan.macros.c}g</span>
+            <span style={{ background: "#22c55e22", color: "#22c55e", borderRadius: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>L {plan.macros.f}g</span>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Ingrédients</div>
+          {plan.ingredients.map((ing, j) => (
+            <div key={j} style={{ display: "flex", gap: 8, marginBottom: 5 }}>
+              <span style={{ color: C.accent, fontWeight: 700, fontSize: 13, minWidth: 90 }}>{ing.qty}</span>
+              <div style={{ fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{ing.item}</span>
+                <span style={{ color: C.muted }}> — {ing.prep}</span>
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 10, background: C.surface, borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>🍳 Cuisson</div>
+            <div style={{ fontSize: 12, color: C.text, lineHeight: 1.6 }}>{plan.cuisson}</div>
+          </div>
+          {plan.tips && (
+            <div style={{ marginTop: 8, fontSize: 12, color: C.yellow }}>💡 {plan.tips}</div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── PAGE : SPORT ─────────────────────────────────────────────────────────────
+function PageSport({ sport, setSport, profile }) {
+  const [type, setType] = useState("Course à pied");
+  const [mins, setMins] = useState("");
+  const w = parseFloat(profile.weight) || 70;
+  const preview = mins ? Math.round((SPORT_DB[type] || 0.01) * w * parseFloat(mins)) : null;
+  const total   = calcSportBurn(sport, profile.weight);
+
+  function add() {
+    if (!mins) return;
+    setSport(prev => [...prev, { id: Date.now(), type, minutes: parseFloat(mins), burned: Math.round((SPORT_DB[type]||0.01)*w*parseFloat(mins)) }]);
+    setMins("");
+  }
+
+  return (
+    <div className="fade">
+      {total > 0 && <Alert type="ok" msg={`Super ! Tu as brûlé ${total} kcal aujourd'hui grâce au sport 🔥`} />}
+      <Card>
+        <Sel label="Activité" value={type} onChange={setType} options={Object.keys(SPORT_DB).map(k => ({ value: k, label: k }))} />
+        <Inp label="Durée" value={mins} onChange={setMins} type="number" placeholder="30" unit="min" />
+        {preview && <div style={{ fontSize: 14, color: C.green, fontWeight: 700, marginBottom: 10 }}>≈ {preview} kcal brûlées</div>}
+        <Btn onClick={add} disabled={!mins} color={C.green} full>＋ Ajouter activité</Btn>
+      </Card>
+      {sport.length > 0 && (
+        <Card>
+          <SectionTitle>Sport du jour — 🔥 {total} kcal brûlées</SectionTitle>
+          {sport.map(sp => (
+            <div key={sp.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{sp.type}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{sp.minutes} min</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontWeight: 800, color: C.green }}>-{sp.burned} kcal</span>
+                <button onClick={() => setSport(prev => prev.filter(x => x.id !== sp.id))}
+                  style={{ background: C.red + "22", border: "none", borderRadius: 7, color: C.red, width: 28, height: 28, cursor: "pointer", fontSize: 14 }}>✕</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── PAGE : POIDS ─────────────────────────────────────────────────────────────
+function PageWeight({ weightLog, setWeightLog, profile }) {
+  const [nw, setNw] = useState("");
+
+  function save() {
+    if (!nw) return;
+    const t = today();
+    setWeightLog(prev => {
+      const next = [...prev.filter(x => x.date !== t), { date: t, weight: parseFloat(nw) }]
+        .sort((a, b) => a.date.localeCompare(b.date));
+      store.set("weight-log", next);
+      return next;
+    });
+    setNw("");
+  }
+
+  const last   = weightLog.length > 0 ? weightLog[weightLog.length-1].weight : null;
+  const first  = weightLog.length > 0 ? weightLog[0].weight : null;
+  const diff   = last && first && weightLog.length > 1 ? (last - first).toFixed(1) : null;
+  const bmi    = nw && profile.height ? calcBMI(nw, profile.height) : null;
+
+  return (
+    <div className="fade">
+      {diff !== null && (
+        <Alert type={parseFloat(diff) <= 0 ? "ok" : "warn"}
+          msg={`Depuis le début : ${parseFloat(diff) <= 0 ? "" : "+"}${diff} kg — ${parseFloat(diff) <= 0 ? "Bonne tendance 💪" : "Tendance en hausse, reste vigilant"}`} />
+      )}
+
+      <Card>
+        <SectionTitle>Enregistrer mon poids</SectionTitle>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}><Inp label="Poids" value={nw} onChange={setNw} type="number" placeholder="75.5" unit="kg" step="0.1" /></div>
+          {bmi && (
+            <div style={{ marginBottom: 11, padding: "10px 12px", background: C.accent + "18", borderRadius: 10, fontSize: 13, color: C.accent, fontWeight: 800, whiteSpace: "nowrap" }}>
+              IMC {bmi}
+            </div>
+          )}
+        </div>
+        <Btn onClick={save} disabled={!nw} full color={C.green}>💾 Enregistrer</Btn>
+      </Card>
+
+      {weightLog.length > 1 && (
+        <Card>
+          <SectionTitle>Courbe de poids</SectionTitle>
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={weightLog} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+              <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.muted }} tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 9, fill: C.muted }} domain={["auto", "auto"]} unit="kg" />
+              <Tooltip
+                contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}
+                formatter={v => [`${v} kg`, "Poids"]}
+                labelStyle={{ color: C.muted }}
+              />
+              <Line type="monotone" dataKey="weight" stroke={C.green} strokeWidth={2.5}
+                dot={{ fill: C.green, r: 5, strokeWidth: 0 }} activeDot={{ r: 7, fill: C.accent }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {weightLog.length === 1 && (
+        <Alert type="tip" msg="Reviens dans 2 jours pour enregistrer ton poids et voir ton évolution en graphique !" />
+      )}
+
+      {weightLog.length > 0 && (
+        <Card>
+          <SectionTitle>Historique</SectionTitle>
+          {[...weightLog].reverse().slice(0, 20).map((e, i, arr) => {
+            const prev = arr[i + 1];
+            const delta = prev ? (e.weight - prev.weight).toFixed(1) : null;
+            return (
+              <div key={e.date} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                <span style={{ color: C.muted }}>{new Date(e.date + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontWeight: 700 }}>{e.weight} kg</span>
+                  {delta !== null && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: parseFloat(delta) <= 0 ? C.green : C.red }}>
+                      {parseFloat(delta) <= 0 ? "" : "+"}{delta}
+                    </span>
+                  )}
+                  <button onClick={() => setWeightLog(prev => { const n = prev.filter(x => x.date !== e.date); store.set("weight-log", n); return n; })}
+                    style={{ background: C.red + "22", border: "none", borderRadius: 6, color: C.red, width: 24, height: 24, cursor: "pointer", fontSize: 12 }}>✕</button>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── PAGE : PROFIL ────────────────────────────────────────────────────────────
+function PageProfile({ profile, setProfile, tdee, deficit, goalCal }) {
+  const [saved, setSaved] = useState(false);
+  const bmi  = profile.weight && profile.height ? calcBMI(profile.weight, profile.height) : null;
+  const bmiC = bmi ? getBMICat(bmi) : null;
+
+  function up(k, v) { setProfile(prev => ({ ...prev, [k]: v })); }
+  function save() { store.set("profile", profile); setSaved(true); setTimeout(() => setSaved(false), 2200); }
+
+  return (
+    <div className="fade">
+      {saved && <Alert type="ok" msg="Profil sauvegardé avec succès !" />}
+
+      <Card>
+        <SectionTitle>Mes infos</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Inp label="Poids"  value={profile.weight} onChange={v => up("weight", v)} type="number" unit="kg"  placeholder="75"  />
+          <Inp label="Taille" value={profile.height} onChange={v => up("height", v)} type="number" unit="cm"  placeholder="178" />
+          <Inp label="Âge"    value={profile.age}    onChange={v => up("age",    v)} type="number" unit="ans" placeholder="30"  />
+        </div>
+        <Sel label="Sexe" value={profile.sex} onChange={v => up("sex", v)}
+          options={[{ value: "H", label: "Homme" }, { value: "F", label: "Femme" }]} />
+        <Sel label="Niveau d'activité" value={profile.activity} onChange={v => up("activity", v)}
+          options={ACTIVITY_LEVELS} />
+      </Card>
+
+      <Card>
+        <SectionTitle>Objectif calorique</SectionTitle>
+        <Inp label="Déficit calorique journalier" value={profile.deficit} onChange={v => up("deficit", v)} type="number" unit="kcal/j" placeholder="300" />
+        <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>Ou impose un objectif fixe :</div>
+        <Inp label="Objectif manuel (optionnel)" value={profile.goalCal} onChange={v => up("goalCal", v)} type="number" unit="kcal" placeholder="auto" />
+        <Btn onClick={save} color={C.green} full>💾 Sauvegarder</Btn>
+      </Card>
+
+      {tdee && (
+        <Card>
+          <SectionTitle>Mes données calculées</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[
+              { l: "Métabolisme de base (BMR)", v: Math.round(tdee / parseFloat(profile.activity)), u: "kcal", c: C.muted   },
+              { l: "Dépense totale (TDEE)",     v: tdee,                                            u: "kcal", c: "#a5b4fc" },
+              { l: "Déficit appliqué",          v: `-${deficit}`,                                   u: "kcal", c: C.orange  },
+              { l: "Objectif final",            v: goalCal,                                         u: "kcal", c: C.green   },
+            ].map(s => (
+              <div key={s.l} style={{ background: C.surface, borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{s.l}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: s.c, lineHeight: 1 }}>{s.v}</div>
+                <div style={{ fontSize: 10, color: C.muted }}>{s.u}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {bmi && (
+        <Card>
+          <SectionTitle>IMC</SectionTitle>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 44, fontWeight: 900, color: bmiC.color, lineHeight: 1 }}>{bmi}</div>
+              <div style={{ fontSize: 14, color: bmiC.color, fontWeight: 700, marginTop: 6 }}>{bmiC.label}</div>
+            </div>
+            <CircleRing value={parseFloat(bmi)} max={40} size={80} stroke={8} color={bmiC.color} label={bmi} />
+          </div>
+        </Card>
+      )}
+
+      <Card sx={{ border: `1px solid ${C.accent}33`, background: C.accent + "08" }}>
+        <SectionTitle>📱 Installer sur iPhone</SectionTitle>
+        {[
+          "1. Ouvre cette page dans Safari (obligatoire)",
+          "2. Appuie sur le bouton Partager ↑ en bas",
+          "3. Sélectionne « Sur l'écran d'accueil »",
+          "4. Nomme l'app NutriTrack, confirme",
+          "5. L'app s'ouvre en plein écran sans Safari ✓",
+        ].map((s, i) => (
+          <div key={i} style={{ fontSize: 13, color: i === 4 ? C.green : C.text, marginBottom: 5, fontWeight: i === 4 ? 600 : 400 }}>{s}</div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
